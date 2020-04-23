@@ -8,6 +8,12 @@ from hw2_utils import TraceEntry, CacheEntry
 MEM_LISTS = 6
 NOT_FOUND = (-1, -1)
 
+FIFO_L = 0
+LRU_L = 1
+FIFO_GHOST_L = 2
+LRU_GHOST_L = 3
+
+
 # Looks for a (non-ghost) entry in the memory.
 # Returns (list_num, index):
 #   list_num: which list in memory contains entry
@@ -74,6 +80,8 @@ fd.close()
 
 # init memory structure
 count = 0
+p = int(options.cachesize / 4)
+
 # memory is an array of 6 lists
 # regular pre-defined algorithms use only memory[0] (the first list),
 # you may use up to all 6 to implement any logic of your choice
@@ -111,6 +119,10 @@ for te in addrList:
             del memory[0][idx]
             memory[0].append(ce) # puts it on MRU side
             mem_dict[ce] = (0, 0) # MUST update value in the hash table
+        if policy == 'HW2': # TODO
+            del memory[list_num][idx]
+            memory[LRU_L].append(ce) # puts it on MRU side
+            mem_dict[ce] = (LRU_L, 0) # MUST update value in the hash table, (LBA, ghost_bool) -> (list_num, idx)
 
     victim = -1      
     if idx == -1:
@@ -124,11 +136,19 @@ for te in addrList:
             elif policy == 'RAND':
                 victim = memory[0].pop(int(random.random() * count))
             elif policy == "HW2":
-                pass
-                # # # # #
                 # TODO: Your eviction policy code goes here
-                # # # # #
-
+                list_num, idx = find_ghost(memory, mem_dict, addr)
+                if list_num == FIFO_GHOST_L:
+                    p = p + 1
+                else:
+                    p = p - 1
+                
+                if len(memory[FIFO_L]) <= p:
+                    victim_list = FIFO_L
+                else:
+                    victim_list = LRU_L
+                victim = memory[victim_list].pop(0)
+                
             # when CacheEntry leaves memory, it's key must be removed from the hash table
             del mem_dict[(victim.LBA, victim.ghost)]
         else:
@@ -138,14 +158,18 @@ for te in addrList:
 
         # now add to memory
         if policy != 'HW2':
-            memory[0].append(ce)
+            memory[0].append(ce) # insert on MRU side
             # when CaceEntry enters memory, it's key must be added to hash
             mem_dict[(ce.LBA, ce.ghost)] = (0, len(memory[0])-1)
         if policy == 'HW2':
-            pass
-            # # # # #
             # TODO: Insert the new entry into the one of the memory lists according to your policy
-            # # # # #
+            if ((list_num, idx) == NOT_FOUND):
+                memory[FIFO_L].append(ce) # insert on MRU side
+                # when CaceEntry enters memory, it's key must be added to hash
+                mem_dict[(ce.LBA, ce.ghost)] = (FIFO_L, len(memory[FIFO_L])-1)
+            else: # found in ghost cache, remove from ghost and add to LRU
+                memory[LRU_L].append(ce) # puts it on MRU side
+                mem_dict[ce] = (LRU_L, 0) # MUST update value in the hash table, (LBA, ghost_bool) -> (list_num, idx)
 
         if victim != -1:
             assert(find_entry(memory, mem_dict, victim) == NOT_FOUND)

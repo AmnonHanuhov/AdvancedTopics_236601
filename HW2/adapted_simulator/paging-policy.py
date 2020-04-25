@@ -80,7 +80,7 @@ fd.close()
 
 # init memory structure
 count = 0
-p = int(options.cachesize / 4)
+p = int(cachesize / 4)
 
 # memory is an array of 6 lists
 # regular pre-defined algorithms use only memory[0] (the first list),
@@ -112,6 +112,7 @@ for te in addrList:
         miss = miss + 1
         te.hit = False
     else: # found in cache
+        print('idx: {} len: {}'.format(idx, len(memory[list_num])))
         ce = memory[list_num][idx] # get the existing non-ghost entry from cache
         hits = hits + 1
         te.hit = True
@@ -122,10 +123,12 @@ for te in addrList:
         if policy == 'HW2': # TODO
             del memory[list_num][idx]
             memory[LRU_L].append(ce) # puts it on MRU side
-            mem_dict[ce] = (LRU_L, 0) # MUST update value in the hash table, (LBA, ghost_bool) -> (list_num, idx)
+            mem_dict[ce] = (LRU_L, len(memory[LRU_L])-1) # (LBA, ghost_bool) -> (list_num, idx)
+            # FIXME: mem_dict[ce][]
 
     victim = -1      
     if idx == -1:
+        ghost_list_num, ghost_idx = find_ghost(memory, mem_dict, addr)
         # miss, replace?
         if count == cachesize:
             # must replace
@@ -137,20 +140,53 @@ for te in addrList:
                 victim = memory[0].pop(int(random.random() * count))
             elif policy == "HW2":
                 # TODO: Your eviction policy code goes here
-                list_num, idx = find_ghost(memory, mem_dict, addr)
-                if list_num == FIFO_GHOST_L:
-                    p = p + 1
-                else:
-                    p = p - 1
-                
+                if ((ghost_list_num, ghost_idx)) != NOT_FOUND:
+                    if ghost_list_num == FIFO_GHOST_L:
+                        p = p + 1
+                    else:
+                        p = p - 1
+
+                # count == cachesize, no space in ghost nor in cache
+                # move from queue to ghost, and evict from ghost
                 if len(memory[FIFO_L]) <= p:
-                    victim_list = FIFO_L
+                    # discard from LRU
+                    discarded_ce = memory[LRU_L].pop(0)  
+                    del mem_dict[(discarded_ce.LBA, discarded_ce.ghost)]
+                    # insert it to ghost
+                    victim = memory[LRU_GHOST_L].pop(0) # make room for it
+                    new_ghost_ce = CacheEntry(discarded_ce.LBA, True)
+                    memory[LRU_GHOST_L].append(new_ghost_ce)
+                    mem_dict[(ce.LBA, ce.ghost)] = (LRU_GHOST_L, len(memory[LRU_GHOST_L])-1)
                 else:
-                    victim_list = LRU_L
-                victim = memory[victim_list].pop(0)
+                    # discard from FIFO
+                    discarded_ce = memory[FIFO_L].pop(0)  
+                    del mem_dict[(discarded_ce.LBA, discarded_ce.ghost)]
+                    # insert it to ghost
+                    victim = memory[FIFO_GHOST_L].pop(0) # make room for it
+                    new_ghost_ce = CacheEntry(discarded_ce.LBA, True)
+                    memory[FIFO_GHOST_L].append(new_ghost_ce)
+                    mem_dict[(ce.LBA, ce.ghost)] = (FIFO_GHOST_L, len(memory[FIFO_GHOST_L])-1)
                 
             # when CacheEntry leaves memory, it's key must be removed from the hash table
             del mem_dict[(victim.LBA, victim.ghost)]
+        elif len(memory[FIFO_L]) + len(memory[LRU_L]) > cachesize / 2: # data queues are full
+            # TODO
+            if len(memory[FIFO_L]) <= p:
+                # discard from LRU
+                discarded_ce = memory[LRU_L].pop(0)  
+                del mem_dict[(discarded_ce.LBA, discarded_ce.ghost)]
+                # insert it to ghost
+                new_ghost_ce = CacheEntry(discarded_ce.LBA, True)
+                memory[LRU_GHOST_L].append(new_ghost_ce)
+                mem_dict[(ce.LBA, ce.ghost)] = (LRU_GHOST_L, len(memory[LRU_GHOST_L])-1)
+            else:
+                # discard from FIFO
+                discarded_ce = memory[FIFO_L].pop(0)  
+                del mem_dict[(discarded_ce.LBA, discarded_ce.ghost)]
+                # insert it to ghost
+                new_ghost_ce = CacheEntry(discarded_ce.LBA, True)
+                memory[FIFO_GHOST_L].append(new_ghost_ce)
+                mem_dict[(ce.LBA, ce.ghost)] = (FIFO_GHOST_L, len(memory[FIFO_GHOST_L])-1)
         else:
             # miss, but no replacement needed (cache not full)
             victim = -1
@@ -162,14 +198,12 @@ for te in addrList:
             # when CaceEntry enters memory, it's key must be added to hash
             mem_dict[(ce.LBA, ce.ghost)] = (0, len(memory[0])-1)
         if policy == 'HW2':
-            # TODO: Insert the new entry into the one of the memory lists according to your policy
-            if ((list_num, idx) == NOT_FOUND):
+            if ((list_num, idx) == NOT_FOUND) and ((ghost_list_num, ghost_idx) == NOT_FOUND):
                 memory[FIFO_L].append(ce) # insert on MRU side
-                # when CaceEntry enters memory, it's key must be added to hash
                 mem_dict[(ce.LBA, ce.ghost)] = (FIFO_L, len(memory[FIFO_L])-1)
             else: # found in ghost cache, remove from ghost and add to LRU
                 memory[LRU_L].append(ce) # puts it on MRU side
-                mem_dict[ce] = (LRU_L, 0) # MUST update value in the hash table, (LBA, ghost_bool) -> (list_num, idx)
+                mem_dict[(ce.LBA, ce.ghost)] = (LRU_L,  len(memory[LRU_L])-1) # (LBA, ghost_bool) -> (list_num, idx)
 
         if victim != -1:
             assert(find_entry(memory, mem_dict, victim) == NOT_FOUND)

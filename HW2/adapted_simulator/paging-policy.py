@@ -8,7 +8,6 @@ from dlist import DList, Node
 
 MEM_LISTS = 6
 NOT_FOUND = (-1, -1)
-HW2_NOT_FOUND = (-1, -1, -1)
 
 FIFO_L = 0
 LRU_L = 1
@@ -98,18 +97,18 @@ fd.close()
 count = 0
 p = int(cachesize / 2)
 
-# memory is an array of 6 lists
-# regular pre-defined algorithms use only memory[0] (the first list),
-# you may use up to all 6 to implement any logic of your choice
-memory = []
-[memory.append([]) for i in range(MEM_LISTS)]
-if policy == 'HW2':
+if policy != 'HW2':
+    # memory is an array of 6 lists
+    # regular pre-defined algorithms use only memory[0] (the first list),
+    # you may use up to all 6 to implement any logic of your choice
+    memory = []
+    [memory.append([]) for i in range(MEM_LISTS)]
+    # mem_dict is a simple hash-table that MUST reflect the memory state.
+    # maps pairs of (LBA, ghost_bool) to (list_num, idx) indices that point
+    # the entry location inside memory (detailed explanation in README)
+    mem_dict = {}
+else: # in our policy we use a different data structure
     memory = [DList() for i in range(0, MEM_LISTS)]
-
-# mem_dict is a simple hash-table that MUST reflect the memory state.
-# maps pairs of (LBA, ghost_bool) to (list_num, idx) indices that point
-#   the entry location inside memory (detailed explanation in README)
-mem_dict = {}
 
 hits = 0
 miss = 0
@@ -138,10 +137,8 @@ for te in addrList:
             memory[0].append(ce) # puts it on MRU side
             mem_dict[ce] = (0, 0) # MUST update value in the hash table
         if policy == 'HW2':
-            # memory[list_num].remove(ce)
-            # memory[LRU_L].append(ce) # puts it on MRU side
-            # mem_dict[(ce.LBA, ce.ghost)] = (LRU_L,  0, memory[LRU_L][-1])
             ce = CacheEntry(addr)
+            # either move the block from FIFO to LRU or promote the block inside LRU to be the head
             if ce in memory[LRU_L]:
                 memory[LRU_L].pop(ce)
             else:
@@ -180,16 +177,12 @@ for te in addrList:
             elif policy == "HW2":
                 if len(memory[FIFO_L]) <= p or len(memory[FIFO_L]) == 0:
                     victim = memory[LRU_L].pop_front()
-                    # if len(memory[LRU_GHOST_L]) == len(memory[FIFO_L]):
                     gce = CacheEntry(victim.LBA, True)
                     memory[LRU_GHOST_L].append(gce)
-                    # mem_dict[(victim.LBA, True)] = (LRU_GHOST_L, 0, memory[LRU_GHOST_L][-1])
                 else:
                     victim = memory[FIFO_L].pop_front()
-                    # if len(memory[FIFO_GHOST_L]) == len(memory[LRU_L]):
                     gce = CacheEntry(victim.LBA, True)
                     memory[FIFO_GHOST_L].append(gce)
-                    # mem_dict[(victim.LBA, True)] = (FIFO_GHOST_L, 0, memory[FIFO_GHOST_L][-1])
                                 
             if policy != 'HW2':
                 # when CacheEntry leaves memory, it's key must be removed from the hash table
@@ -205,9 +198,9 @@ for te in addrList:
                 if memory[next_list+2].size != 0:
                     memory[next_list+2].pop_front()
                 else:
-                    memory[((next_list+1)%2)+2].pop_front()
+                    # if the ghost cache of the list we want to add to is empty, we have to evict from the other ghost cache
+                    memory[((next_list+1)%2)+2].pop_front() 
             memory[next_list].append(ce)
-            # mem_dict[(ce.LBA, ce.ghost)] = (next_list,  0, memory[next_list][-1])
         else:
             memory[0].append(ce) # insert on MRU side
             # when CaceEntry enters memory, it's key must be added to hash

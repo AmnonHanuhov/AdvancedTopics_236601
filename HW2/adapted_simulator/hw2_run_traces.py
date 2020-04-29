@@ -6,14 +6,15 @@ import numpy as np
 
 output_filename = "hw2_cache.log"
 directory = os.fsencode("./traces/")
-# cache_sizes = [size for size in range(12, 21)]
-cache_sizes = [2 for size in range(12, 21)]
+cache_sizes = [size for size in range(12, 21)]
 cache_sizes_blocks = [2**size for size in range(12, 21)]
 cache_sizes_labels = [str(size) for size in range(12, 21)]
 
 def rerun_hw2_policy():
      with open(output_filename, "a") as logfile:
           for file in os.listdir(directory):
+               if file != b'prxy_1.trace':
+                    continue
                filename = os.fsdecode(file)
                if filename.endswith(".trace"):
                     for cache_size in cache_sizes_blocks:
@@ -61,7 +62,6 @@ if __name__ == '__main__':
      cols = int(len(data.keys()) / 2)
      fig, plots = plt.subplots(2, cols)
      fig.tight_layout()
-     # fig.set_size_inches(23, 10, forward=True)
      for (i, (trace, d)) in enumerate(data.items()):
           plot = plots[int(i / cols)][int(i % cols)]
           for policy, hitrates in d.items():

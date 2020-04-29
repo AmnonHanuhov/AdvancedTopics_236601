@@ -103,12 +103,13 @@ if policy != 'HW2':
     # you may use up to all 6 to implement any logic of your choice
     memory = []
     [memory.append([]) for i in range(MEM_LISTS)]
-    # mem_dict is a simple hash-table that MUST reflect the memory state.
-    # maps pairs of (LBA, ghost_bool) to (list_num, idx) indices that point
-    # the entry location inside memory (detailed explanation in README)
-    mem_dict = {}
 else: # in our policy we use a different data structure
     memory = [DList() for i in range(0, MEM_LISTS)]
+
+# mem_dict is a simple hash-table that MUST reflect the memory state.
+# maps pairs of (LBA, ghost_bool) to (list_num, idx) indices that point
+# the entry location inside memory (detailed explanation in README)
+mem_dict = {}
 
 hits = 0
 miss = 0
@@ -175,7 +176,7 @@ for te in addrList:
             elif policy == 'RAND':
                 victim = memory[0].pop(int(random.random() * count))
             elif policy == "HW2":
-                if len(memory[FIFO_L]) <= p or len(memory[FIFO_L]) == 0:
+                if len(memory[LRU_L]) > 0 and len(memory[FIFO_L]) <= p:
                     victim = memory[LRU_L].pop_front()
                     gce = CacheEntry(victim.LBA, True)
                     memory[LRU_GHOST_L].append(gce)

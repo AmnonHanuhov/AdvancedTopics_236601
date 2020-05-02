@@ -13,10 +13,10 @@ cache_sizes_labels = [str(size) for size in range(12, 21)]
 def rerun_hw2_policy():
      with open(output_filename, "a") as logfile:
           for file in os.listdir(directory):
-               if file != b'prxy_1.trace':
-                    continue
                filename = os.fsdecode(file)
                if filename.endswith(".trace"):
+                    if filename != 'prxy_1.trace':
+                         continue
                     for cache_size in cache_sizes_blocks:
                          bashCommand = \
                               "python paging-policy.py -f traces/{} --policy=HW2 --cachesize={} -N".format(filename, cache_size)

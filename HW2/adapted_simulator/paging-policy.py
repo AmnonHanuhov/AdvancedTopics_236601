@@ -95,7 +95,8 @@ fd.close()
 
 # init memory structure
 count = 0
-p = int(cachesize / 2)
+# p = int(cachesize / 2)
+p = 0
 
 if policy != 'HW2':
     # memory is an array of 6 lists
@@ -114,14 +115,86 @@ mem_dict = {}
 hits = 0
 miss = 0
 
+def replace(gce):
+    global miss, hits, count, p, mem_dict, memory, addrList
+    if (len(memory[FIFO_L]) > 0) and ((len(memory[FIFO_L]) > p) or (gce in memory[LRU_GHOST_L] and len(memory[FIFO_L]) == p)):
+        victim = memory[FIFO_L].pop_front()
+        gce = CacheEntry(victim.LBA, True)
+        memory[FIFO_GHOST_L].append(gce)
+    else:
+        victim = memory[LRU_L].pop_front()
+        gce = CacheEntry(victim.LBA, True)
+        memory[LRU_GHOST_L].append(gce)
+    return victim
+
+
 if policy not in ["FIFO", "LRU", "MRU", "RAND", "HW2"]:
     print('Policy %s is not yet implemented' % policy)
     exit(1)
 
-for te in addrList:
+def ARC(te):
+    global miss, hits, count, p, mem_dict, memory, addrList
     # first, lookup
     addr = te.block
     list_num, idx = find_entry(memory, mem_dict, addr)
+
+    if ((list_num, idx) != NOT_FOUND):
+        hits = hits + 1
+        te.hit = True
+        ce = CacheEntry(addr)
+        # either move the block from FIFO to LRU or promote the block inside LRU to be the head
+        memory[list_num].pop(ce)
+        memory[LRU_L].append(ce)
+    else:
+        ce = CacheEntry(addr) # create a new non-ghost entry for the new address
+        miss = miss + 1
+        te.hit = False
+        gce = CacheEntry(addr, True)
+        ghost_list_num, ghost_idx = find_ghost(memory, mem_dict, addr)
+        if ghost_list_num == FIFO_GHOST_L:
+            if len(memory[FIFO_L]) != 0:
+                p = min(cachesize, p + max(1, int(len(memory[LRU_L]) / len(memory[FIFO_L]))))
+            else:
+                p = cachesize
+            replace(gce)
+            memory[FIFO_GHOST_L].pop(gce)
+            memory[LRU_L].append(ce)
+        elif ghost_list_num == LRU_GHOST_L:
+            if len(memory[LRU_L]) != 0:
+                p = max(0, p - max(1, int(len(memory[FIFO_L]) / len(memory[LRU_L]))))
+            else:
+                p = 0
+            replace(gce)
+            memory[LRU_GHOST_L].pop(gce)
+            memory[LRU_L].append(ce)
+        else: # not in cache and ghost-cache
+            if len(memory[FIFO_L]) + len(memory[FIFO_GHOST_L]) == cachesize:
+                if len(memory[FIFO_L]) < cachesize:
+                    memory[FIFO_GHOST_L].pop_front()
+                    victim = replace(gce)
+                else:
+                    victim = memory[FIFO_L].pop_front()
+            elif len(memory[FIFO_L]) + len(memory[FIFO_GHOST_L]) < cachesize:
+                if sum(map(lambda m: len(m), memory)) >= cachesize:
+                    if sum(map(lambda m: len(m), memory)) == 2*cachesize:
+                        memory[LRU_GHOST_L].pop_front()
+                    replace(gce)
+            memory[FIFO_L].append(ce)
+
+    assert(check_mem_limit(memory, 2*cachesize))
+    if notrace == False:
+        print(te)
+    
+
+for te in addrList:
+    if policy == 'HW2':
+        ARC(te)
+        continue
+
+    # first, lookup
+    addr = te.block
+    list_num, idx = find_entry(memory, mem_dict, addr)
+    # print(len(memory[FIFO_L]), len(memory[LRU_L]))
 
     if ((list_num, idx) == NOT_FOUND):
         ce = CacheEntry(addr) # create a new non-ghost entry for the new address
@@ -157,7 +230,7 @@ for te in addrList:
                 memory[ghost_list_num].pop(CacheEntry(addr, True))
                 if ghost_list_num == FIFO_GHOST_L:
                     if len(memory[FIFO_L]) != 0:
-                        p = p + max(1, int(len(memory[LRU_L]) / len(memory[FIFO_L])))
+                        p = min(cachesize, p + max(1, int(len(memory[LRU_L]) / len(memory[FIFO_L]))))
                     else:
                         p = cachesize
                 else:
@@ -176,15 +249,17 @@ for te in addrList:
             elif policy == 'RAND':
                 victim = memory[0].pop(int(random.random() * count))
             elif policy == "HW2":
-                if len(memory[LRU_L]) > 0 and len(memory[FIFO_L]) <= p:
-                    victim = memory[LRU_L].pop_front()
-                    gce = CacheEntry(victim.LBA, True)
-                    memory[LRU_GHOST_L].append(gce)
+                if len(memory[FIFO_L]) + len(memory[FIFO_GHOST_L]) == cachesize:
+                    if len(memory[FIFO_L]) < cachesize:
+                        memory[FIFO_GHOST_L].pop_front()
+                        replace()
+                    else:
+                        victim = memory[FIFO_L].pop_front()
                 else:
-                    victim = memory[FIFO_L].pop_front()
-                    gce = CacheEntry(victim.LBA, True)
-                    memory[FIFO_GHOST_L].append(gce)
-                                
+                    if sum(map(lambda m: len(m), memory)) == 2*cachesize:
+                        memory[LRU_GHOST_L].pop_front()
+                    replace()
+                    
             if policy != 'HW2':
                 # when CacheEntry leaves memory, it's key must be removed from the hash table
                 del mem_dict[(victim.LBA, victim.ghost)]
@@ -196,11 +271,12 @@ for te in addrList:
         # now add to memory
         if policy == 'HW2':
             if sum(map(lambda m: len(m), memory)) == 2*cachesize:
-                if memory[next_list+2].size != 0:
-                    memory[next_list+2].pop_front()
-                else:
-                    # if the ghost cache of the list we want to add to is empty, we have to evict from the other ghost cache
-                    memory[((next_list+1)%2)+2].pop_front() 
+                print(1)
+            #     if len(memory[next_list+2]) != 0:
+            #         memory[next_list+2].pop_front()
+            #     else:
+            #         # if the ghost cache of the list we want to add to is empty, we have to evict from the other ghost cache
+            #         memory[((next_list+1)%2)+2].pop_front() 
             memory[next_list].append(ce)
         else:
             memory[0].append(ce) # insert on MRU side

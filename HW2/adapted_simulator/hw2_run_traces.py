@@ -5,7 +5,7 @@ import subprocess
 import matplotlib.pyplot as plt
 import numpy as np
 
-output_filename = "hw2_cache_splited.log"
+output_filename = "results/hw2_cache_splited.log"
 directory = os.fsencode("./traces/")
 cache_sizes = [size for size in range(12, 21)]
 cache_sizes_blocks = [2**size for size in range(12, 21)]
@@ -20,19 +20,28 @@ def plot_log():
                     data[trace] = {}
                if not policy in data[trace]:
                     data[trace][policy] = []
-               data[trace][policy].append(float(hitrate))
+               data[trace][policy].append((int(cache_size), float(hitrate)))
 
-     with open('cache.log', 'r') as file:
+     with open('results/cache_splited.log', 'r') as file:
           for line in file:
                (trace, policy, cache_size, misses, hits, hitrate) = line.split()
+               if policy == 'MRU':
+                    continue
                if not trace in data:
                     data[trace] = {}
                if not policy in data[trace]:
                     data[trace][policy] = []
-               data[trace][policy].append(float(hitrate))
+               data[trace][policy].append((int(cache_size), float(hitrate)))
+
+     for trace, val in data.items():
+          for policy, sizes_hitrates_list in val.items():
+               l = sorted(sizes_hitrates_list, key=lambda tup: tup[0])
+               val[policy] = []
+               for tup in l:
+                    val[policy].append(tup[1])
 
      # Finaly export figure to png
-     cols = int(len(data.keys()) / 2)
+     cols = int((1+len(data.keys())) / 2)
      fig, plots = plt.subplots(2, cols)
      fig.tight_layout()
      for (i, (trace, d)) in enumerate(data.items()):
@@ -50,6 +59,8 @@ def plot_log():
           # plot.autoscale()
           plot.legend()
 
+     plt.autoscale()
+     plt.delaxes()
      plt.ioff()
      plt.show()
 
@@ -60,10 +71,11 @@ def commands():
           for file in os.listdir(directory):
                filename = os.fsdecode(file)
                if filename.endswith(".trace"):
-                    for cache_size in cache_sizes_blocks:
-                         bashCommand = \
-                              "python paging-policy.py -f traces/{} --policy=HW2 --cachesize={} -N -S".format(filename, cache_size)
-                         result.append((bashCommand, filename, cache_size))
+                    for policy in ["HW2", ]:
+                         for cache_size in cache_sizes_blocks:
+                              bashCommand = \
+                                   "python paging-policy.py -f traces/{} --policy={} --cachesize={} -N -S".format(filename, policy, cache_size)
+                              result.append((bashCommand, filename, cache_size))
      return result
 
 def run_trace(tup):
@@ -86,7 +98,7 @@ if __name__ == '__main__':
      parser.add_option('-r', '--rerun', default=False, action='store_true', dest='rerun')
      (options, args) = parser.parse_args()
      if options.rerun:
-          with Pool(4) as p:
+          with Pool(6) as p:
                bash_commands = commands()
                p.map(run_trace, bash_commands)
 

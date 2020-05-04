@@ -21,12 +21,17 @@ LRU_GHOST_L = 3
 #   index: index of entry in said memory list
 # (if not found, returns -1 for both)
 def find_entry(memory, mem_dict, LBA):
+    ce = CacheEntry(LBA, False)
     if policy == 'HW2':
-        ce = CacheEntry(LBA, False)
         for li in range(0, 2):
             if ce in memory[li]:
                 return (li, 0)
         return NOT_FOUND
+
+    if policy != 'RAND':
+        if ce not in memory[0]:
+            return NOT_FOUND
+        return (0, 0)
 
     if (LBA, False) not in mem_dict:
         return NOT_FOUND
@@ -35,12 +40,17 @@ def find_entry(memory, mem_dict, LBA):
 # Looks for a ghost entry in the memory
 # format same as find_entry
 def find_ghost(memory, mem_dict, LBA):
+    ce = CacheEntry(LBA, True)
     if policy == 'HW2':
-        ce = CacheEntry(LBA, True)
         for li in range(2, 4):
             if ce in memory[li]:
                 return (li, 0)
         return NOT_FOUND
+
+    if policy != 'RAND':
+        if ce not in memory[0]:
+            return NOT_FOUND
+        return (0, 0)
 
     if (LBA, True) not in mem_dict:
         return NOT_FOUND
@@ -109,12 +119,12 @@ count = 0
 # p = int(cachesize / 2)
 p = 0
 
-if policy != 'HW2':
+if policy == 'RAND':
     # memory is an array of 6 lists
     # regular pre-defined algorithms use only memory[0] (the first list),
     # you may use up to all 6 to implement any logic of your choice
     memory = []
-    [memory.append([]) for i in range(MEM_LISTS)]
+    [memory.append([]) for i in range(0, MEM_LISTS)]
 else: # in our policy we use a different data structure
     memory = [DList() for i in range(0, MEM_LISTS)]
 
@@ -291,19 +301,17 @@ for line in fd:
         addr = te.block
         list_num, idx = find_entry(memory, mem_dict, addr)
 
+        ce = CacheEntry(addr) # create a new non-ghost entry for the new address
         if ((list_num, idx) == NOT_FOUND):
-            ce = CacheEntry(addr) # create a new non-ghost entry for the new address
             idx = -1
             miss = miss + 1
             te.hit = False
         else: # found in cache
-            ce = memory[list_num][idx] # get the existing non-ghost entry from cache
             hits = hits + 1
             te.hit = True
             if policy == 'LRU' or policy == 'MRU':
-                del memory[0][idx]
+                memory[0].pop(ce)
                 memory[0].append(ce) # puts it on MRU side
-                mem_dict[ce] = (0, 0) # MUST update value in the hash table
 
         victim = -1      
         if idx == -1:
@@ -311,25 +319,26 @@ for line in fd:
             if count == cachesize:
                 # must replace
                 if policy == 'FIFO' or policy == 'LRU':
-                    victim = memory[0].pop(0)
+                    victim = memory[0].pop_front()
                 elif policy == 'MRU':
-                    victim = memory[0].pop(count-1)
+                    victim = memory[0].pop_back()
                 elif policy == 'RAND':
                     victim = memory[0].pop(int(random.random() * count))
+                    del mem_dict[(victim.LBA, victim.ghost)]
 
-                # when CacheEntry leaves memory, it's key must be removed from the hash table
-                del mem_dict[(victim.LBA, victim.ghost)]
-        else:
-            # miss, but no replacement needed (cache not full)
-            victim = -1
-            count = count + 1
+            else:
+                # miss, but no replacement needed (cache not full)
+                victim = -1
+                count = count + 1
 
             memory[0].append(ce)
-            # when CaceEntry enters memory, it's key must be added to hash
-            mem_dict[(ce.LBA, ce.ghost)] = (0, len(memory[0])-1)
+            if policy == 'RAND':
+                # when CaceEntry enters memory, it's key must be added to hash
+                mem_dict[(ce.LBA, ce.ghost)] = (0, len(memory[0])-1)
+
             
-        if victim != -1:
-            assert(find_entry(memory, mem_dict, victim) == NOT_FOUND)
+            if victim != -1:
+                assert(find_entry(memory, mem_dict, victim) == NOT_FOUND)
 
         # if you fail this assertion, you have exceeded your cache space capacity.
         assert(check_mem_limit(memory, 2*cachesize))

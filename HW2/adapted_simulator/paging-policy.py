@@ -104,16 +104,6 @@ split       = options.split
 
 random.seed(seed)
 
-addrList = []
-fd = open(addressFile)
-for line in fd:
-    if (split):
-        # split multi-block requests into single-block requests
-        addrList += TraceEntry(line).split_blocks()
-    else:
-        addrList.append(TraceEntry(line))
-fd.close()
-
 # init memory structure
 count = 0
 # p = int(cachesize / 2)
@@ -280,64 +270,74 @@ def ARC(te):
     if notrace == False:
         print(te)
 
-for te in addrList:
-    if policy == 'HW2':
-        ARC(te)
-        continue
-    if policy == 'HW2_SLOW':
-        slow_ARC(te)
-        continue
+addrList = []
+fd = open(addressFile)
+for line in fd:
+    if (split):
+        # split multi-block requests into single-block requests
+        addrList = TraceEntry(line).split_blocks()
+    else:
+        addrList = [TraceEntry(line), ]
 
-    # first, lookup
-    addr = te.block
-    list_num, idx = find_entry(memory, mem_dict, addr)
+    for te in addrList:
+        if policy == 'HW2':
+            ARC(te)
+            continue
+        if policy == 'HW2_SLOW':
+            slow_ARC(te)
+            continue
 
-    if ((list_num, idx) == NOT_FOUND):
-        ce = CacheEntry(addr) # create a new non-ghost entry for the new address
-        idx = -1
-        miss = miss + 1
-        te.hit = False
-    else: # found in cache
-        ce = memory[list_num][idx] # get the existing non-ghost entry from cache
-        hits = hits + 1
-        te.hit = True
-        if policy == 'LRU' or policy == 'MRU':
-            del memory[0][idx]
-            memory[0].append(ce) # puts it on MRU side
-            mem_dict[ce] = (0, 0) # MUST update value in the hash table
+        # first, lookup
+        addr = te.block
+        list_num, idx = find_entry(memory, mem_dict, addr)
 
-    victim = -1      
-    if idx == -1:
-        # miss, replace?
-        if count == cachesize:
-            # must replace
-            if policy == 'FIFO' or policy == 'LRU':
-                victim = memory[0].pop(0)
-            elif policy == 'MRU':
-                victim = memory[0].pop(count-1)
-            elif policy == 'RAND':
-                victim = memory[0].pop(int(random.random() * count))
+        if ((list_num, idx) == NOT_FOUND):
+            ce = CacheEntry(addr) # create a new non-ghost entry for the new address
+            idx = -1
+            miss = miss + 1
+            te.hit = False
+        else: # found in cache
+            ce = memory[list_num][idx] # get the existing non-ghost entry from cache
+            hits = hits + 1
+            te.hit = True
+            if policy == 'LRU' or policy == 'MRU':
+                del memory[0][idx]
+                memory[0].append(ce) # puts it on MRU side
+                mem_dict[ce] = (0, 0) # MUST update value in the hash table
 
-            # when CacheEntry leaves memory, it's key must be removed from the hash table
-            del mem_dict[(victim.LBA, victim.ghost)]
+        victim = -1      
+        if idx == -1:
+            # miss, replace?
+            if count == cachesize:
+                # must replace
+                if policy == 'FIFO' or policy == 'LRU':
+                    victim = memory[0].pop(0)
+                elif policy == 'MRU':
+                    victim = memory[0].pop(count-1)
+                elif policy == 'RAND':
+                    victim = memory[0].pop(int(random.random() * count))
+
+                # when CacheEntry leaves memory, it's key must be removed from the hash table
+                del mem_dict[(victim.LBA, victim.ghost)]
         else:
             # miss, but no replacement needed (cache not full)
             victim = -1
             count = count + 1
 
-        memory[0].append(ce)
-        # when CaceEntry enters memory, it's key must be added to hash
-        mem_dict[(ce.LBA, ce.ghost)] = (0, len(memory[0])-1)
-
+            memory[0].append(ce)
+            # when CaceEntry enters memory, it's key must be added to hash
+            mem_dict[(ce.LBA, ce.ghost)] = (0, len(memory[0])-1)
+            
         if victim != -1:
             assert(find_entry(memory, mem_dict, victim) == NOT_FOUND)
 
-    # if you fail this assertion, you have exceeded your cache space capacity.
-    assert(check_mem_limit(memory, 2*cachesize))
+        # if you fail this assertion, you have exceeded your cache space capacity.
+        assert(check_mem_limit(memory, 2*cachesize))
 
-    if notrace == False:
-        print(te)
-    
+        if notrace == False:
+            print(te)
+
+fd.close()
 print('')
 print('FINALSTATS hits %d   misses %d   hitrate %.5f' % (hits, miss, (100.0*float(hits))/(float(hits)+float(miss))))
 print('')

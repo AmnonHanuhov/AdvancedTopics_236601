@@ -1,44 +1,17 @@
 from optparse import OptionParser
 import os
+from multiprocessing import Pool
 import subprocess
 import matplotlib.pyplot as plt
 import numpy as np
 
-output_filename = "hw2_cache.log"
+output_filename = "hw2_cache_splited.log"
 directory = os.fsencode("./traces/")
 cache_sizes = [size for size in range(12, 21)]
 cache_sizes_blocks = [2**size for size in range(12, 21)]
 cache_sizes_labels = [str(size) for size in range(12, 21)]
 
-def rerun_hw2_policy():
-     with open(output_filename, "a") as logfile:
-          for file in os.listdir(directory):
-               filename = os.fsdecode(file)
-               if filename.endswith(".trace"):
-                    if filename != 'prxy_1.trace':
-                         continue
-                    for cache_size in cache_sizes_blocks:
-                         bashCommand = \
-                              "python paging-policy.py -f traces/{} --policy=HW2 --cachesize={} -N".format(filename, cache_size)
-                         print(bashCommand)
-                         completed_process = subprocess.run(bashCommand.split(), capture_output=True)
-                         output_str = completed_process.stdout.decode("utf-8")
-                         for line in iter(output_str.splitlines()):
-                              if line.startswith('FINALSTATS'):
-                                   (hits, misses, hitrate)  = line.split()[2:7:2]
-                                   break
-                         output_str = '{} HW2 {} {} {} {}'.format(filename, cache_size, hits, misses, hitrate)
-                         print(output_str)
-                         logfile.write(output_str+'\n')
-                         logfile.flush()
-
-if __name__ == '__main__':
-     parser = OptionParser()
-     parser.add_option('-r', '--rerun', default=False, action='store_true', dest='rerun')
-     (options, args) = parser.parse_args()
-     if options.rerun:
-          rerun_hw2_policy()
-
+def plot_log():
      data = {}
      with open(output_filename, 'r') as file:
           for line in file:
@@ -79,3 +52,43 @@ if __name__ == '__main__':
 
      plt.ioff()
      plt.show()
+
+
+def commands():
+     result = []
+     with open(output_filename, "a") as logfile:
+          for file in os.listdir(directory):
+               filename = os.fsdecode(file)
+               if filename.endswith(".trace"):
+                    for cache_size in cache_sizes_blocks:
+                         bashCommand = \
+                              "python paging-policy.py -f traces/{} --policy=HW2 --cachesize={} -N -S".format(filename, cache_size)
+                         result.append((bashCommand, filename, cache_size))
+     return result
+
+def run_trace(tup):
+     bashCommand, filename, cache_size = tup
+     print(bashCommand)
+     completed_process = subprocess.run(bashCommand.split(), capture_output=True)
+     output_str = completed_process.stdout.decode("utf-8")
+     for line in iter(output_str.splitlines()):
+          if line.startswith('FINALSTATS'):
+               (hits, misses, hitrate)  = line.split()[2:7:2]
+               break
+     output_str = '{} HW2 {} {} {} {}'.format(filename, cache_size, hits, misses, hitrate)
+     print(output_str)
+     with open(output_filename, "a") as logfile:
+          logfile.write(output_str+'\n')
+          logfile.flush()
+
+if __name__ == '__main__':
+     parser = OptionParser()
+     parser.add_option('-r', '--rerun', default=False, action='store_true', dest='rerun')
+     (options, args) = parser.parse_args()
+     if options.rerun:
+          with Pool(4) as p:
+               bash_commands = commands()
+               p.map(run_trace, bash_commands)
+
+     plot_log()
+

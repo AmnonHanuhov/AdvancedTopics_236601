@@ -229,6 +229,11 @@ def replace(gce):
 
 def ARC(te):
     global miss, hits, count, p, mem_dict, memory, addrList
+    if len(memory[LRU_L]) == 0:
+        ratio = 1.0
+    else:
+        ratio = len(memory[FIFO_L])/len(memory[LRU_L])
+
     # first, lookup
     addr = te.block
     list_num, idx = find_entry(memory, mem_dict, addr)

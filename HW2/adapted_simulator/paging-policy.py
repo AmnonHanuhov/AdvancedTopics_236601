@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
-from optparse import OptionParser import random
-
+from optparse import OptionParser
+import random
 from hw2_utils import TraceEntry, CacheEntry
 from dlist import DList, Node
 

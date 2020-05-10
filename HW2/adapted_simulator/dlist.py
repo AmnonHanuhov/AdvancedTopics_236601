@@ -48,9 +48,6 @@ class DList(object):
     def pop_back(self):
         return self.pop(self.head.val)
 
-    def pop_from(self, num):
-        return self.pop(self.head.val)
-
     def find(self, val):
         if val in self.map:
             return self.map[val]

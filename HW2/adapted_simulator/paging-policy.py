@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
-from optparse import OptionParser
-import random
+from optparse import OptionParser import random
 
 from hw2_utils import TraceEntry, CacheEntry
 from dlist import DList, Node
@@ -55,27 +54,6 @@ def find_ghost(memory, mem_dict, LBA):
     if (LBA, True) not in mem_dict:
         return NOT_FOUND
     return mem_dict[(LBA, True)]
-
-# Inserts an entry to one of the memory lists while updating all subsequent mem_dict entries
-# (for memory entries of which the index in memory was moved as a result of the insertion)
-def insert_mem_entry(memory, mem_dict, list_num, idx, ce):
-    memory[list_num].insert(idx, ce)
-
-    for x in range(idx, len(memory[list_num])): # Must update hash values for all entries who were moved backwards
-        entry = memory[list_num][x]
-        mem_dict[(entry.LBA, entry.ghost)] = (list_num, x)
-
-# Removes an entry (by index) from one of memory lists while updating all subsequent mem_dict entries
-# (for memory entries of which the index in memory was moved as a result of the insertion)
-# Returns the value of the removed entry (the CacheEntry object)
-def remove_mem_entry(memory, mem_dict, list_num, idx):
-    victim = memory[list_num].pop(idx)
-
-    for x in range(idx, len(memory[list_num])): # Must update hash values for all entries who were moved backwards
-        entry = memory[list_num][x]
-        mem_dict[(entry.LBA, entry.ghost)] = (list_num, x)
-
-    return victim
 
 # Asserts that the limit on cache capacity is not broken
 def check_mem_limit(memory, limit):
@@ -136,83 +114,9 @@ mem_dict = {}
 hits = 0
 miss = 0
 
-if policy not in ["FIFO", "LRU", "MRU", "RAND", "HW2", "HW2_SLOW"]:
+if policy not in ["FIFO", "LRU", "MRU", "RAND", "HW2"]:
     print('Policy %s is not yet implemented' % policy)
     exit(1)
-
-def slow_replace(gce):
-    global miss, hits, count, p, mem_dict, memory, addrList
-    if (len(memory[FIFO_L]) > 0) and ((len(memory[FIFO_L]) > p) or ((find_ghost(memory, mem_dict, gce.LBA)[0] != FIFO_GHOST_L) and len(memory[FIFO_L]) == p)):
-        victim = remove_mem_entry(memory, mem_dict, FIFO_L, 0)
-        del mem_dict[(victim.LBA, victim.ghost)]
-        gce = CacheEntry(victim.LBA, True)
-        insert_mem_entry(memory, mem_dict, FIFO_GHOST_L, len(memory[FIFO_GHOST_L]), gce)
-    else:
-        victim = remove_mem_entry(memory, mem_dict, LRU_L, 0)
-        del mem_dict[(victim.LBA, victim.ghost)]
-        gce = CacheEntry(victim.LBA, True)
-        insert_mem_entry(memory, mem_dict, LRU_GHOST_L, len(memory[LRU_GHOST_L]), gce)
-    return victim
-
-
-def slow_ARC(te):
-    global miss, hits, count, p, mem_dict, memory, addrList
-    # first, lookup
-    addr = te.block
-    list_num, idx = find_entry(memory, mem_dict, addr)
-
-    if ((list_num, idx) != NOT_FOUND):
-        hits = hits + 1
-        te.hit = True
-        ce = CacheEntry(addr)
-        # either move the block from FIFO to LRU or promote the block inside LRU to be the head
-        remove_mem_entry(memory, mem_dict, list_num, idx)
-        insert_mem_entry(memory, mem_dict, LRU_L, len(memory[LRU_L]), ce)
-    else:
-        ce = CacheEntry(addr) # create a new non-ghost entry for the new address
-        miss = miss + 1
-        te.hit = False
-        gce = CacheEntry(addr, True)
-        ghost_list_num, ghost_idx = find_ghost(memory, mem_dict, addr)
-        if ghost_list_num == FIFO_GHOST_L:
-            if len(memory[FIFO_L]) != 0:
-                p = min(cachesize, p + max(1, int(len(memory[LRU_L]) / len(memory[FIFO_L]))))
-            else:
-                p = cachesize
-            slow_replace(gce)
-            victim = remove_mem_entry(memory, mem_dict, FIFO_GHOST_L, ghost_idx)
-            del mem_dict[(victim.LBA, victim.ghost)]
-            insert_mem_entry(memory, mem_dict, LRU_L, len(memory[LRU_L]), ce)
-        elif ghost_list_num == LRU_GHOST_L:
-            if len(memory[LRU_L]) != 0:
-                p = max(0, p - max(1, int(len(memory[FIFO_L]) / len(memory[LRU_L]))))
-            else:
-                p = 0
-            slow_replace(gce)
-            victim = remove_mem_entry(memory, mem_dict, LRU_GHOST_L, ghost_idx)
-            del mem_dict[(victim.LBA, victim.ghost)]
-            insert_mem_entry(memory, mem_dict, LRU_L, len(memory[LRU_L]), ce)
-        else: # not in cache and ghost-cache
-            if len(memory[FIFO_L]) + len(memory[FIFO_GHOST_L]) == cachesize:
-                if len(memory[FIFO_L]) < cachesize:
-                    victim = remove_mem_entry(memory, mem_dict, FIFO_GHOST_L, 0)
-                    del mem_dict[(victim.LBA, victim.ghost)]
-                    slow_replace(gce)
-                else:
-                    victim = remove_mem_entry(memory, mem_dict, FIFO_L, 0)
-                    del mem_dict[(victim.LBA, victim.ghost)]
-            elif len(memory[FIFO_L]) + len(memory[FIFO_GHOST_L]) < cachesize:
-                if sum(map(lambda m: len(m), memory)) >= cachesize:
-                    if sum(map(lambda m: len(m), memory)) == 2*cachesize:
-                        victim = remove_mem_entry(memory, mem_dict, LRU_GHOST_L, 0)
-                        del mem_dict[(victim.LBA, victim.ghost)]
-                    slow_replace(gce)
-            insert_mem_entry(memory, mem_dict, FIFO_L, len(memory[FIFO_L]), ce)
-
-    assert(check_mem_limit(memory, 2*cachesize))
-    if notrace == False:
-        print(te)
-    
 
 def replace(gce):
     global miss, hits, count, p, mem_dict, memory, addrList
@@ -298,9 +202,6 @@ for line in fd:
         if policy == 'HW2':
             ARC(te)
             continue
-        if policy == 'HW2_SLOW':
-            slow_ARC(te)
-            continue
 
         # first, lookup
         addr = te.block
@@ -318,7 +219,7 @@ for line in fd:
                 memory[0].pop(ce)
                 memory[0].append(ce) # puts it on MRU side
 
-        victim = -1      
+        victim = -1
         if idx == -1:
             # miss, replace?
             if count == cachesize:

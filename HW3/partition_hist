@@ -1,0 +1,19 @@
+input=$1
+
+all=`cat $input  | grep Partition | awk -F 'Partition="' '{print $2}' | cut -d"-" -f1`
+
+total_lines=$(echo "$all" | wc -l)
+
+echo "total count: (count - temperature)"
+
+echo "$all" | sort | uniq -c
+
+echo "percentage count: (percentage - temperature)"
+
+echo "$all" | sort | uniq -c | while read -r line ; do
+
+	count=$(echo $line | cut -d" " -f1);
+	temperature=$(echo $line | cut -d" " -f2);
+	percent=$(echo "scale=4; ($count/$total_lines)*100" | bc);
+	echo "$percent $temperature"
+done

@@ -10,6 +10,9 @@ class TraceEntry():
         # temperature defaults at 10 - you should change it from outside
         self.temperature = 10
 
+    def set_tempreture(self, tempreture):
+        self.temperature = tempreture
+        
     # Returns a default string representation for the entry
     def __str__(self):
         return "{} {} {} {} {} {}".format(

@@ -54,10 +54,8 @@ split       = options.split
 
 random.seed(seed)
 
-# memory is an array of 6 lists
-# regular pre-defined algorithms use only memory[0] (the first list),
-# you may use up to all 6 to implement any logic of your choice
 memory = [DList() for i in range(0, MEM_LISTS)]
+tempreture_stat = [0 for i in range(0, MEM_LISTS)]
 average_counter = 0
 
 with open(addressFile) as fd:
@@ -81,14 +79,19 @@ with open(addressFile) as fd:
                 counter = counter + 1
 
                 tempreture_i = 0
-                while counter > (2 ** tempreture_i) * average_counter and tempreture_i < MEM_LISTS - 1:
+                while counter > (3 ** tempreture_i) * average_counter and tempreture_i < MEM_LISTS - 1:
                     tempreture_i = tempreture_i + 1
                 memory[tempreture_i].append(CacheEntry(addr), counter)
 
-            average_counter = average_counter + 1 / sum(map(lambda m: len(m), memory))
             assert(check_mem_limit(memory, 2*cachesize))
+
 
             tempreture_num = find_entry(memory, addr)
             te.set_tempreture(10-tempreture_num)
+            tempreture_stat[tempreture_num] = tempreture_stat[tempreture_num] + 1
             print(te)
+
+        average_counter = average_counter + len(block_list) / sum(map(lambda m: len(m), memory))
+
+print(tempreture_stat)
     

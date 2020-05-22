@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 from time import localtime
-from optparse import OptionParser
+import argparse
 import random
 from hw3_utils import TraceEntry, CacheEntry
 from dlist import DList
@@ -34,36 +34,28 @@ def check_mem_limit(memory, limit):
 #
 # main program
 #
-parser = OptionParser()
-parser.add_option('-f', '--addressfile', default='',   help='a file with a bunch of addresses in it',                                action='store', type='string', dest='addressfile')
-parser.add_option('-p', '--policy', default='FIFO',    help='replacement policy: FIFO, LRU, RAND',                                   action='store', type='string', dest='policy')
-parser.add_option('-C', '--cachesize', default='4096',    help='size of the page cache, in pages',                                      action='store', type='string', dest='cachesize')
-parser.add_option('-s', '--seed', default='0',         help='random number seed',                                                    action='store', type='string', dest='seed')
-parser.add_option('-S', '--split', default=True,    help='split every multi-block request into many single-block ones',             action='store_true', dest='split')
+parser = argparse.ArgumentParser()
+parser.add_argument('input', type=str)
+parser.add_argument('annotation', type=str)
+parser.add_argument('stat', type=str)
+args = parser.parse_args()
 
-(options, args) = parser.parse_args()
+input = str(args.input)
+annotation   = str(args.annotation)
+stat = str(args.stat)
+print(input, annotation, stat)
 
-if options.addressfile == '':
-    parser.error('Address file not given')
-
-addressFile = str(options.addressfile)
-cachesize   = int(options.cachesize)
-seed        = int(options.seed)
-policy      = str(options.policy)
-split       = options.split
-
-random.seed(seed)
-
+split       = True
 memory = [DList() for i in range(0, MEM_LISTS)]
 tempreture_stat = [0 for i in range(0, MEM_LISTS)]
 average_counter = 0
 
-with open(addressFile) as fd:
-    for fd_line in fd:
+with open(input) as in_fd, open(annotation, 'w') as annotation_fd, open(stat, 'w') as stat_fd:
+    for line in in_fd:
         if (split):
-            block_list = TraceEntry(fd_line).split_blocks()
+            block_list = TraceEntry(line).split_blocks()
         else:
-            block_list = [TraceEntry(fd_line)]
+            block_list = [TraceEntry(line)]
 
         for te in block_list:
             # first, lookup
@@ -79,19 +71,18 @@ with open(addressFile) as fd:
                 counter = counter + 1
 
                 tempreture_i = 0
-                while counter > (3 ** tempreture_i) * average_counter and tempreture_i < MEM_LISTS - 1:
+                while counter > (2 ** tempreture_i) * average_counter and tempreture_i < MEM_LISTS - 1:
                     tempreture_i = tempreture_i + 1
                 memory[tempreture_i].append(CacheEntry(addr), counter)
-
-            assert(check_mem_limit(memory, 2*cachesize))
 
 
             tempreture_num = find_entry(memory, addr)
             te.set_tempreture(10-tempreture_num)
             tempreture_stat[tempreture_num] = tempreture_stat[tempreture_num] + 1
-            print(te)
+            print(te, file=annotation_fd)
 
         average_counter = average_counter + len(block_list) / sum(map(lambda m: len(m), memory))
 
-print(tempreture_stat)
+    # print(tempreture_stat, file=stat_fd)
+    print(tempreture_stat)
     

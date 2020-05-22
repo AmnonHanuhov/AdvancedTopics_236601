@@ -5,6 +5,9 @@ with open('sizes.csv') as fd:
             continue
 
         trace, unique = line.split(',')
-        for op in [0.05, 0.10, 0.15, 0.20]:
-            blocks = ceil((int(unique)/(1-float(op)))/32)
-            print('{}\top: {}, blocks: {}'.format(trace, op, blocks))
+        for op in [0.10, 0.15, 0.20]:
+            physical_pages = float(unique)/(1-float(op))
+            blocks1 = ceil(physical_pages/32)
+            blocks2 = ceil(float(unique)/32) + 12
+            print('{}\top: {}, blocks: {}'.format(trace, op, max(blocks1, blocks2)))
+            

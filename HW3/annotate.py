@@ -46,9 +46,9 @@ tempreture_stat = [0 for i in range(0, MEM_LISTS)]
 
 high_page_count = 1                     # number of valid pages with high IRG
 low_page_count = 1                      # number of valid pages with low IRG
-high_average_counter = 0                # average access count for pages with high IRG
-low_average_counter = 0                 # average access count for pages with low IRG
-average_irg = 0                         # average IRG of all accesses
+high_average_counter = 0                # approximated average access count for pages with high IRG
+low_average_counter = 0                 # approximated average access count for pages with low IRG
+average_irg = 0                         # moving average IRG of all accesses
 
 with open(input) as in_fd, open(annotation, 'w') as annotation_fd, open(stat, 'w') as stat_fd:
     for time, line in enumerate(in_fd):
@@ -98,7 +98,7 @@ with open(input) as in_fd, open(annotation, 'w') as annotation_fd, open(stat, 'w
                     low_average_counter = low_average_counter + 1 / low_page_count
                     low_page_count = low_page_count + 1
                     
-            average_irg = (irg + time * average_irg) / (time + 1)  # update the average irg of all accesses
+            average_irg = (irg + time * average_irg) / (time + 1)  # update the moving average irg of all accesses
 
             # find page's current tempreture(as defined in class) and update te's new tempreture for it
             tempreture_num = find_entry(memory, addr) 

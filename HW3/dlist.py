@@ -1,9 +1,10 @@
 class Node(object):
-    def __init__(self, prev, next, val, counter):
+    def __init__(self, prev, next, val, counter, time):
         self.prev = prev
         self.next = next
         self.val = val
         self.counter = counter
+        self.time = time
 
 class DList(object):
     '''double linked list'''
@@ -14,13 +15,13 @@ class DList(object):
         self.tail = None
         self.size = 0
 
-    def append(self, val, counter=1):
+    def append(self, val, counter=1, time=0):
         assert(not (val in self.map))
         if self.size == 0:
-            self.head = Node(None, None, val, counter)
+            self.head = Node(None, None, val, counter, time)
             self.tail = self.head
         else:
-            self.head.next = Node(self.head, None, val, counter)
+            self.head.next = Node(self.head, None, val, counter, time)
             self.head = self.head.next
 
         self.size = self.size + 1
@@ -41,7 +42,7 @@ class DList(object):
         node.prev = None
         self.size = self.size - 1
         del self.map[val]
-        return node.counter
+        return (node.counter, node.time)
 
     def pop_front(self):
         return self.pop(self.tail.val)

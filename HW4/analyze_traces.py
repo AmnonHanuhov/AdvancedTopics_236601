@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from math import log
 
-output_filename = "results/hw2_cache_splited_full.log"
-output_filename2 = "results/hw2_cache_splited_full_.log"
+paging_policy = 'paging_policy_h2v2.py'
+
+output_filename = "results/HW4.log"
+output_filename2 = "results/LRU.log"
 output_filename3 = "results/Bar.csv"
-directory = os.fsencode("./traces/short/")
+directory = os.fsencode("./Traces/")
 
 # cache_sizes = [size for size in range(12, 21)]
 # cache_sizes_blocks = [2**size for size in range(12, 21)]
@@ -24,25 +26,24 @@ def plot_log():
      # create list for each [trace][policy]
      with open(output_filename, 'r') as file:
           for line in file:
-               (trace, policy, cache_size, misses, hits, hitrate) = line.split()
+               (trace, policy, cache_size, hitrate) = line.split()
                if not trace in data:
-                    data[trace] = OrderedDict([("HW2",[]), ("LRU",[]), ("FIFO",[]), ("RAND",[])])
+                    data[trace] = OrderedDict([("HW4",[]), ("LRU",[])])
      with open(output_filename2, 'r') as file:
           for line in file:
-               (trace, policy, cache_size, misses, hits, hitrate) = line.split()
+               (trace, policy, cache_size, hitrate) = line.split()
                if not trace in data:
-                    data[trace] = OrderedDict([("HW2",[]), ("LRU",[]), ("FIFO",[]), ("RAND",[])])
+                    data[trace] = OrderedDict([("HW4",[]), ("LRU",[])])
      # append to lists
      with open(output_filename, 'r') as file:
           for line in file:
-               (trace, policy, cache_size, misses, hits, hitrate) = line.split()
+               (trace, policy, cache_size, hitrate) = line.split()
                data[trace][policy].append((int(cache_size), float(hitrate)))
      # append to lists
      with open(output_filename2, 'r') as file:
           for line in file:
-               (trace, policy, cache_size, misses, hits, hitrate) = line.split()
-               if policy != 'MRU':
-                    data[trace][policy].append((int(cache_size), float(hitrate)))
+               (trace, policy, cache_size, hitrate) = line.split()
+               data[trace][policy].append((int(cache_size), float(hitrate)))
      # sort by cachesize
      for trace, val in data.items():
           for policy, sizes_hitrates_list in val.items():
@@ -87,7 +88,7 @@ def plot_log_new():
           for line in file:
                (trace, policy, cache_size, hitrate) = line.split(',')
                if not trace in data:
-                    data[trace] = OrderedDict([("HW2",[]), ("LRU",[]), ("FIFO",[]), ("RAND",[])])
+                    data[trace] = OrderedDict([("HW4",[]), ("LRU",[])])
      # append to lists
      with open(output_filename3, 'r') as file:
           for line in file:
@@ -136,12 +137,11 @@ def commands():
      with open(output_filename, "a") as logfile:
           for file in os.listdir(directory):
                filename = os.fsdecode(file)
-               if filename.endswith(".trace"):
-                    for policy in ["HW2"]:
-                         for cache_size in cache_sizes_blocks:
-                              bashCommand = \
-                                   "python paging-policy.py -f traces/short/{} --policy={} --cachesize={} -N -S".format(filename, policy, cache_size)
-                              result.append((bashCommand, filename, cache_size, policy))
+               if not filename.endswith(".gz"):
+                    for cache_size in cache_sizes_blocks:
+                         bashCommand = \
+                              "python {} -f Traces/{} --policy={} --cachesize={} -N -S".format(paging_policy, filename, 'HW4', cache_size)
+                         result.append((bashCommand, filename, cache_size, 'HW4'))
      return result
 
 def run_trace(tup):
@@ -170,5 +170,5 @@ if __name__ == '__main__':
                bash_commands = commands()
                p.map(run_trace, bash_commands)
 
-     plot_log_new()
+     # plot_log_new()
 

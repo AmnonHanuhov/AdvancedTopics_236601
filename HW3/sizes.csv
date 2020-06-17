@@ -2,3 +2,18 @@ Trace,UniquePages
 hm_1.trace,2270
 rsrch_1.trace,3415
 synthetic4.trace,1597
+
+hm_1.trace	op: 0.1, blocks: 83
+hm_1.trace	op: 0.15, blocks: 84
+hm_1.trace	op: 0.2, blocks: 89
+rsrch_1.trace	op: 0.1, blocks: 119
+rsrch_1.trace	op: 0.15, blocks: 126
+rsrch_1.trace	op: 0.2, blocks: 134
+synthetic4.trace	op: 0.1, blocks: 62
+synthetic4.trace	op: 0.15, blocks: 62
+synthetic4.trace	op: 0.2, blocks: 63
+
+avg irg:
+hm_1, 8.658717149544149
+rsrch, 11.113030898563052
+synthetic4, 10.395156721918635

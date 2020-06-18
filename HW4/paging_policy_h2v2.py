@@ -19,44 +19,50 @@ LRU_GHOST_L = 3
 def check_mem_limit(memory, cachesize):
     if policy == 'LRU':
         return sum(map(lambda m: len(m), memory)) <= 4 * cachesize  # 2 for LBA items and 2 for FP items
-    else:
+    if policy == 'HW4_LBA_ARC':
         return len(memory[1]) <= 2 * cachesize and sum(map(lambda m: len(m), memory[0])) <= 2 * cachesize
+    if policy == 'HW4':
+        return sum(map(lambda m: len(m), memory[0])) <= 2 * cachesize and sum(map(lambda m: len(m), memory[1])) <= 2 * cachesize
 
 
-def replace(memory, item):
+def replace(memory, p, item):
     if (len(memory[FIFO_L]) > 0) and ((len(memory[FIFO_L]) > p) or (item in memory[LRU_GHOST_L] and len(memory[FIFO_L]) == p)):
         victim = memory[FIFO_L].pop_front()
+        if type(item) is FPItem:
+            victim.in_cache = False
         memory[FIFO_GHOST_L].append(victim)
     else:
         victim = memory[LRU_L].pop_front()
+        if type(item) is FPItem:
+            victim.in_cache = False
         memory[LRU_GHOST_L].append(victim)
     return victim
 
 
-def ARC(memory, p, L):
+def ARC(memory, p, count, item):
     if len(memory[LRU_L]) == 0:
         ratio = 1.0
     else:
         ratio = len(memory[FIFO_L])/len(memory[LRU_L])
 
-    LBA_item = LBAItem(L, 0)
+    # FP_item = FPItem(F, in_cache=True)
     list_num = NOT_FOUND
     for i in range(0, 2):
-        if LBA_item in memory[i]:
+        if item in memory[i]:
             list_num = i
             break;
 
     if (list_num != NOT_FOUND):
         te.hit = True
         # either move the block from FIFO to LRU or promote the block inside LRU to be the head
-        LBA_item = memory[list_num].pop(LBA_item)
-        memory[LRU_L].append(LBA_item)
+        item = memory[list_num].pop(item)
+        memory[LRU_L].append(item)
     else:
         te.hit = False
 
         ghost_list_num = NOT_FOUND
         for i in range(2, 4):
-            if LBA_item in memory[i]:
+            if item in memory[i]:
                 ghost_list_num = i
                 break;
 
@@ -64,33 +70,43 @@ def ARC(memory, p, L):
             if len(memory[FIFO_L]) != 0:
                 p = min(cachesize, p + max(1, int(len(memory[LRU_L]) / len(memory[FIFO_L]))))
             else:
-                p = cachesize
-            replace(memory, LBA_item)
-            LBA_item = memory[FIFO_GHOST_L].pop(LBA_item)
-            memory[LRU_L].append(LBA_item)
+                p = 0.1 * cachesize
+            replace(memory, p, item)
+            item = memory[FIFO_GHOST_L].pop(item)
+            if type(item) is FPItem:
+                item.in_cache = True
+            memory[LRU_L].append(item)
         elif ghost_list_num == LRU_GHOST_L:
             if len(memory[LRU_L]) != 0:
                 p = max(0, p - max(1, int(len(memory[FIFO_L]) / len(memory[LRU_L]))))
             else:
                 p = 0
-            replace(memory, LBA_item)
-            LBA_item = memory[LRU_GHOST_L].pop(LBA_item)
-            memory[LRU_L].append(LBA_item)
+            replace(memory, p, item)
+            item = memory[LRU_GHOST_L].pop(item)
+            if type(item) is FPItem:
+                item.in_cache = True
+            memory[LRU_L].append(item)
         else: # not in cache and ghost-cache
             if len(memory[FIFO_L]) + len(memory[FIFO_GHOST_L]) == cachesize:
                 if len(memory[FIFO_L]) < cachesize:
                     memory[FIFO_GHOST_L].pop_front()
-                    replace(memory, LBA_item)
+                    victim = replace(memory, p, item)
                 else:
-                    memory[FIFO_L].pop_front()
+                    victim = memory[FIFO_L].pop_front()
+                if type(item) is FPItem:
+                    count -= 1
             elif len(memory[FIFO_L]) + len(memory[FIFO_GHOST_L]) < cachesize:
                 if sum(map(lambda m: len(m), memory)) >= cachesize:
                     if sum(map(lambda m: len(m), memory)) == 2*cachesize:
                         memory[LRU_GHOST_L].pop_front()
-                    replace(memory, LBA_item)
-            memory[FIFO_L].append(LBA_item)
+                    replace(memory, p, item)
+                    if type(item) is FPItem:
+                        count -= 1
+            memory[FIFO_L].append(item)
+            if type(item) is FPItem:
+                count += 1
             
-    return LBA_item 
+    return item, p
 
 #
 # main program
@@ -123,9 +139,12 @@ if policy == 'LRU':
     # regular pre-defined algorithms use only memory[0] (the first list),
     # you may use up to all 6 to implement any logic of your choice
     [memory.append([]) for i in range(MEM_LISTS)]
-else: # in our policy we use a different data structure
+if policy == 'HW4_LBA_ARC': # in our policy we use a different data structure
     memory.append([DList() for i in range(ARC_LISTS)])
     memory.append([])
+if policy == 'HW4': 
+    memory.append([DList() for i in range(ARC_LISTS)])
+    memory.append([DList() for i in range(ARC_LISTS)])
 
 class LBA_Dict(object):
     def __init__(self, memory):
@@ -144,18 +163,39 @@ class LBA_Dict(object):
             if item in l:
                 return l[item]
 
+class FP_Dict(object):
+    def __init__(self, memory):
+        self.memory = memory
+
+    def __contains__(self, F):
+        FP_item = FPItem(F)
+        for l in self.memory:
+            if FP_item in l:
+                return True
+        return False
+
+    def __getitem__(self, F):
+        FP_item = FPItem(F)
+        for l in self.memory:
+            if FP_item in l:
+                return l[FP_item]
+
 
 # Each key (either integer LBA or integer FP) points to a matching LBAItem or FPItem in one of the memory lists.
 # For convenience, the values are now references to the actual objects in the lists (not indices).
 FP_dict  = {}
 if policy == 'LRU':
     LBA_dict = {}
-else:
+if policy == 'HW4_LBA_ARC':
     LBA_dict = LBA_Dict(memory[0])
+if policy == 'HW4':
+    LBA_dict = LBA_Dict(memory[0])
+    FP_dict  = FP_Dict(memory[1])
 
-p = 0
+LBA_p = 0
+FP_p = 0
 
-if policy not in ["LRU", "HW4"]:
+if policy not in ["LRU", "HW4", "HW4_LBA_ARC"]:
     print('Policy %s is not yet implemented' % policy)
     exit(1)
 
@@ -237,7 +277,7 @@ with open(addressFile) as fd:
             LBA_item.FP = FP_item.FP
 
 
-        if policy == 'HW4':
+        if policy == 'HW4_LBA_ARC':
             # Take care of replacing the fingerprint:
             if F in FP_dict:  # item exists in memory
                 FP_item = FP_dict[F]
@@ -264,7 +304,19 @@ with open(addressFile) as fd:
 
             # Take care of replacing the LBA item
             # Check if any evictions are needed in LBA list
-            LBA_item = ARC(memory[0], p, L)
+            LBA_item, LBA_p = ARC(memory[0], LBA_p, count, LBAItem(L, 0))
+
+            # update the LBA item to point at the correct fingerprint
+            LBA_item.FP = FP_item.FP
+
+        if policy == 'HW4':
+            # Take care of replacing the fingerprint:
+            # now check if any evictions are needed as a result of the insertion:
+            FP_item, FP_p = ARC(memory[1], FP_p, count, FPItem(F, in_cache=True))
+
+            # Take care of replacing the LBA item
+            # Check if any evictions are needed in LBA list
+            LBA_item, LBA_p = ARC(memory[0], LBA_p, count, LBAItem(L, 0))
 
             # update the LBA item to point at the correct fingerprint
             LBA_item.FP = FP_item.FP

@@ -205,11 +205,6 @@ with open(addressFile) as fd:
         te = TraceEntry(fd_line)
         L = te.block
 
-        # statistics
-        if not te.FP in fp_stat:
-            fp_stat[te.FP] = 0
-        fp_stat[te.FP] += 1
-
         # First check if request hits or misses (result may vary according to request type, as stated in the pdf)
         # At the same time, determine the fingerprint (either look it up in the cache, or read it from the trace in case of a miss)
         if te.op == 'R': # Read path
@@ -339,7 +334,3 @@ with open(addressFile) as fd:
 print('')
 print('FINALSTATS hits %d   misses %d   hitrate %.5f' % (hits, miss, (100.0*float(hits))/(float(hits)+float(miss))))
 print('')
-
-with open('results/fp.log', 'a') as fd:
-    for k, v in fp_stat.items():
-        print(addressFile.split('/')[-1], k, v, file=fd)

@@ -199,7 +199,6 @@ if policy not in ["LRU", "HW4", "HW4_LBA_ARC"]:
     print('Policy %s is not yet implemented' % policy)
     exit(1)
 
-fp_stat = {}
 with open(addressFile) as fd:
     for fd_line in fd:
         te = TraceEntry(fd_line)
